@@ -95,10 +95,8 @@
       padding: 12px;
     }
     .add .row { display: flex; gap: 8px; }
-    #name { flex: 1; }
-    #freezer { max-width: 45%; }
+    #category, #freezer, #added { flex: 1; }
     #qty { width: 72px; }
-    #added { flex: 1; }
     .add button {
       background: var(--accent);
       color: #fff;
@@ -108,9 +106,19 @@
       font-weight: 600;
     }
 
-    #search { width: 100%; margin: 20px 0 10px; background: var(--card); }
+    .search-row { display: flex; align-items: center; gap: 8px; margin: 20px 0 10px; }
+    #search { flex: 1; background: var(--card); }
 
     #list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+    .group {
+      margin: 12px 4px 0;
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+    .group:first-child { margin-top: 0; }
     .item {
       display: flex;
       align-items: center;
@@ -125,16 +133,17 @@
     .info { flex: 1; min-width: 0; }
     .name { font-weight: 600; overflow-wrap: anywhere; }
     .meta { font-size: 0.85rem; color: var(--muted); }
-    .move {
+    .pick {
       position: relative;
       display: inline-block;
       color: var(--accent);
       text-decoration: underline;
     }
-    .move:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .actions { display: flex; gap: 14px; margin-top: 2px; font-size: 0.85rem; }
+    .pick:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
     /* An invisible native select over the link: phones get their own picker,
        and 16px text stops iOS from zooming in when it's tapped. */
-    .move select {
+    .pick select {
       position: absolute;
       inset: 0;
       width: 100%;
@@ -163,15 +172,61 @@
       text-align: center;
       font-weight: 600;
       font-variant-numeric: tabular-nums;
-      -moz-appearance: textfield;
     }
     .qty .n:focus { outline: none; border-color: var(--accent); background: var(--bg); }
-    .qty .n::-webkit-inner-spin-button,
-    .qty .n::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+    /* Select mode: rows get a checkbox and tap to select; per-row controls step aside. */
+    .check { display: none; flex: none; width: 20px; height: 20px; margin: 0; accent-color: var(--accent); }
+    body.selecting .check { display: block; }
+    body.selecting .qty, body.selecting .actions { display: none; }
+    body.selecting .item { cursor: pointer; user-select: none; }
+    body.selecting main { padding-bottom: 120px; }
+    .item.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+    .bulk {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 12px 16px;
+      background: var(--card);
+      border-top: 1px solid var(--border);
+      box-shadow: 0 -4px 16px rgb(0 0 0 / 0.08);
+    }
+    .bulk-inner {
+      max-width: 528px;
+      margin: 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px 12px;
+      font-size: 0.9rem;
+    }
+    #selected-count { margin-right: auto; color: var(--muted); }
+    .pick:has(select:disabled), .link:disabled { opacity: 0.4; cursor: default; }
+    .pick select:disabled { cursor: default; }
 
     #empty { color: var(--muted); text-align: center; padding: 32px 0; }
 
     footer { margin-top: 40px; font-size: 0.85rem; color: var(--muted); text-align: center; }
+    .categories { margin-top: 10px; font-size: 0.85rem; color: var(--muted); }
+    .categories summary { cursor: pointer; width: fit-content; }
+    .categories p { margin: 0; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 8px; }
+    .chip {
+      display: inline-flex;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--card);
+      color: var(--text);
+    }
+    .chip button { background: none; border: 0; padding: 5px 4px 5px 12px; }
+    .chip .remove { padding: 5px 10px 5px 4px; color: var(--muted); }
+    .chips .new {
+      background: none;
+      border: 1px dashed var(--border);
+      border-radius: 999px;
+      padding: 5px 12px;
+    }
   </style>
 </head>
 <body>
@@ -191,18 +246,30 @@
     </div>
 
     <form class="add" autocomplete="off">
+      <input id="name" placeholder="What's going in?" aria-label="Item name" required>
       <div class="row">
-        <input id="name" placeholder="What's going in?" aria-label="Item name" required>
+        <select id="category" aria-label="Category"></select>
         <select id="freezer" aria-label="Which freezer"></select>
       </div>
       <div class="row">
-        <input id="qty" type="number" min="1" value="1" aria-label="Quantity">
+        <input id="qty" inputmode="decimal" value="1" aria-label="Quantity">
         <input id="added" type="date" aria-label="Date frozen">
         <button type="submit">Add</button>
       </div>
     </form>
 
-    <input id="search" type="search" placeholder="Search…" aria-label="Search">
+    <details class="categories">
+      <summary>Edit categories</summary>
+      <div class="chips" id="category-chips">
+        <button id="add-category" class="new" type="button">+ New category</button>
+      </div>
+      <p>Tap a category to rename it, or × to delete it.</p>
+    </details>
+
+    <div class="search-row">
+      <input id="search" type="search" placeholder="Search…" aria-label="Search">
+      <button id="select-toggle" class="link" type="button">Select</button>
+    </div>
     <ul id="list"></ul>
     <p id="empty" hidden></p>
 
@@ -212,30 +279,49 @@
       <button id="import" class="link" type="button">Import backup</button>
       <input id="import-file" type="file" accept=".json,application/json" hidden>
     </footer>
+
+    <div class="bulk" id="bulk" hidden>
+      <div class="bulk-inner">
+        <span id="selected-count"></span>
+        <label class="pick">Category<select id="bulk-category" aria-label="Set category for selected"></select></label>
+        <label class="pick">Move<select id="bulk-move" aria-label="Move selected to freezer"></select></label>
+        <button id="bulk-remove" class="link" type="button">Remove</button>
+        <button id="bulk-done" class="link" type="button">Done</button>
+      </div>
+    </div>
   </main>
 
   <template id="row">
     <li class="item">
+      <input class="check" type="checkbox">
       <div class="info">
         <div class="name"></div>
-        <div class="meta">
-          <span class="details"></span>
-          <label class="move">Move<select aria-label="Move to another freezer">
-            <option value="" selected disabled>Move to…</option>
-          </select></label>
+        <div class="meta details"></div>
+        <div class="actions">
+          <label class="pick">Move<select class="freezer-pick" aria-label="Freezer"></select></label>
+          <label class="pick">Category<select class="category-pick" aria-label="Category"></select></label>
         </div>
       </div>
       <div class="qty">
         <button class="dec" type="button" aria-label="Use one">−</button>
-        <input class="n" type="number" inputmode="numeric" min="0">
+        <input class="n" inputmode="decimal">
         <button class="inc" type="button" aria-label="Add one">+</button>
       </div>
     </li>
   </template>
 
+  <template id="chip">
+    <span class="chip"><button class="rename" type="button"></button><button class="remove" type="button">×</button></span>
+  </template>
+
   <script>
     const STORAGE_KEY = 'freezer-vault';
+    const VIEW_KEY = 'freezer-vault-view';
     const OLD_AFTER_DAYS = 90;
+    const DEFAULT_CATEGORIES = [
+      'Bread & baked goods', 'Dessert', 'Fruits & veggies', 'Ingredients',
+      'Nuts', 'Prepared foods', 'Raw meat', 'Seafood',
+    ];
 
     const tabs = document.getElementById('tabs');
     const addFreezerButton = document.getElementById('add-freezer');
@@ -244,17 +330,31 @@
     const deleteFreezerButton = document.getElementById('delete-freezer');
     const form = document.querySelector('.add');
     const nameInput = document.getElementById('name');
+    const categorySelect = document.getElementById('category');
     const freezerSelect = document.getElementById('freezer');
     const qtyInput = document.getElementById('qty');
     const dateInput = document.getElementById('added');
     const search = document.getElementById('search');
     const list = document.getElementById('list');
     const empty = document.getElementById('empty');
+    const categoryChips = document.getElementById('category-chips');
+    const addCategoryButton = document.getElementById('add-category');
     const rowTemplate = document.getElementById('row');
+    const chipTemplate = document.getElementById('chip');
     const importFile = document.getElementById('import-file');
+    const selectToggle = document.getElementById('select-toggle');
+    const bulkBar = document.getElementById('bulk');
+    const selectedCount = document.getElementById('selected-count');
+    const bulkCategory = document.getElementById('bulk-category');
+    const bulkMove = document.getElementById('bulk-move');
+    const bulkRemove = document.getElementById('bulk-remove');
+    const newCategoryOption = new Option('+ New category…');
 
-    let { freezers, items } = load();
-    let current = 'all'; // a freezer id, or 'all'
+    let { freezers, categories, items } = load();
+    let current = loadView(); // a freezer id, or 'all'
+    let formCategory = ''; // kept so picking "+ New category…" can be cancelled
+    let selecting = false; // picking several items for a bulk action
+    const selected = new Set(); // ids of the picked items
 
     function load() {
       try {
@@ -266,9 +366,25 @@
 
     function save() {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ freezers, items }));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ freezers, categories, items }));
       } catch {}
       render();
+    }
+
+    // The open freezer tab is remembered in this browser, so a refresh lands on it again.
+    function loadView() {
+      try {
+        return localStorage.getItem(VIEW_KEY) || 'all';
+      } catch {
+        return 'all';
+      }
+    }
+
+    function setCurrent(id) {
+      current = id;
+      try {
+        localStorage.setItem(VIEW_KEY, id);
+      } catch {}
     }
 
     // Cleans up saved data or a backup file, filling in anything left out so
@@ -283,6 +399,13 @@
         .map(f => ({ id: typeof f.id === 'string' ? f.id : newId(), name: f.name.trim() }));
       if (!freezers.length) freezers.push({ id: newId(), name: 'Main freezer' });
 
+      // No category list (older saves, or left out of a backup) means the defaults.
+      const categories = [];
+      for (const c of Array.isArray(data.categories) ? data.categories : DEFAULT_CATEGORIES) {
+        if (typeof c === 'string' && c.trim() && !categoryFor(c)) categories.push(c.trim());
+      }
+      categories.sort(byName);
+
       // Items can point at a freezer by id or by name (any capitalization).
       // A missing or misspelled freezer means the first one.
       function freezerFor(ref) {
@@ -293,21 +416,32 @@
         return freezer.id;
       }
 
+      // Categories match by name (any capitalization); anything else means none.
+      function categoryFor(ref) {
+        const name = String(ref ?? '').trim().toLowerCase();
+        return categories.find(c => c.toLowerCase() === name);
+      }
+
       const items = data.items
         .filter(i => i && typeof i.name === 'string')
         .map(i => ({
           id: newId(),
           name: i.name,
-          qty: Math.max(1, parseInt(i.qty, 10) || 1),
+          qty: amountOrOne(i.qty),
           added: /^\d{4}-\d{2}-\d{2}$/.test(i.added) ? i.added : undefined,
           freezer: freezerFor(i.freezer),
+          category: categoryFor(i.category),
         }));
 
-      return { freezers, items };
+      return { freezers, categories, items };
     }
 
     function newId() {
       return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    }
+
+    function byName(a, b) {
+      return a.localeCompare(b);
     }
 
     // The freezer being viewed, or null for the "All" view.
@@ -316,15 +450,49 @@
       return freezers.find(f => f.id === current) || null;
     }
 
-    // Same thing frozen on the same day in the same freezer shares one row.
-    function findMatch(freezer, name, added) {
+    // The same thing frozen on the same day, in the same freezer and category, shares one row.
+    function findMatch(like) {
       return items.find(item =>
-        item.freezer === freezer && item.added === added &&
-        item.name.toLowerCase() === name.toLowerCase()
+        item.freezer === like.freezer && item.added === like.added &&
+        item.category === like.category &&
+        item.name.toLowerCase() === like.name.toLowerCase()
       );
     }
 
+    // Changes an item's freezer or category, folding it into a matching row if there is one.
+    function moveItem(item, key, value) {
+      const moved = { ...item, [key]: value || undefined };
+      const existing = findMatch(moved);
+      if (existing && existing !== item) {
+        existing.qty = roundAmount(existing.qty + item.qty);
+        items = items.filter(i => i !== item);
+      } else {
+        Object.assign(item, moved);
+      }
+    }
+
+    // Reads amounts like "2", "1.5", "1,5", "1/2" or "1 1/2" (NaN if it can't).
+    function parseAmount(value) {
+      const text = String(value ?? '').trim().replace(',', '.');
+      const fraction = text.match(/^(?:(\d+)\s+)?(\d+)\/(\d+)$/);
+      const n = fraction
+        ? Number(fraction[1] || 0) + fraction[2] / fraction[3]
+        : text ? Number(text) : NaN;
+      return Number.isFinite(n) ? roundAmount(n) : NaN;
+    }
+
+    function amountOrOne(value) {
+      const n = parseAmount(value);
+      return n > 0 ? n : 1;
+    }
+
+    // Two decimal places is plenty, and stops 0.1 + 0.2 showing up as 0.30000000000000004.
+    function roundAmount(n) {
+      return Math.round(n * 100) / 100;
+    }
+
     function things(n) {
+      n = roundAmount(n);
       return `${n} thing${n === 1 ? '' : 's'}`;
     }
 
@@ -371,7 +539,19 @@
         // Undated items sort first: they were probably in there before tracking started.
         .sort((a, b) => (a.added || '').localeCompare(b.added || ''));
 
-      list.replaceChildren(...shown.map(item => renderItem(item, !freezer)));
+      // Only what's on screen stays selected, so bulk actions never touch hidden items.
+      for (const id of selected) if (!shown.some(i => i.id === id)) selected.delete(id);
+
+      // Group by category, with uncategorized things last. Headings only
+      // show up once something has a category.
+      const groups = [...categories, undefined]
+        .map(category => ({ category, rows: shown.filter(i => i.category === category) }))
+        .filter(group => group.rows.length);
+      const headings = groups.some(group => group.category);
+      list.replaceChildren(...groups.flatMap(group => [
+        ...(headings ? [renderHeading(group.category ?? 'No category')] : []),
+        ...group.rows.map(item => renderItem(item, !freezer)),
+      ]));
 
       const total = inView.reduce((sum, item) => sum + item.qty, 0);
       const where = freezer ? freezer.name : `${freezers.length} freezers`;
@@ -381,9 +561,33 @@
 
       // Only the "All" view needs to ask which freezer new items go in.
       freezerSelect.hidden = !!freezer;
-      const selected = freezerSelect.value;
+      const chosenFreezer = freezerSelect.value;
       freezerSelect.replaceChildren(...freezers.map(f => new Option(f.name, f.id)));
-      if (freezers.some(f => f.id === selected)) freezerSelect.value = selected;
+      if (freezers.some(f => f.id === chosenFreezer)) freezerSelect.value = chosenFreezer;
+
+      if (!categories.includes(formCategory)) formCategory = '';
+      categorySelect.replaceChildren(
+        new Option('No category', ''),
+        ...categories.map(c => new Option(c, c)),
+        newCategoryOption,
+      );
+      categorySelect.value = formCategory;
+
+      categoryChips.replaceChildren(...categories.map(renderChip), addCategoryButton);
+
+      document.body.classList.toggle('selecting', selecting);
+      selectToggle.textContent = selecting ? 'Done' : 'Select';
+      bulkBar.hidden = !selecting;
+      selectedCount.textContent = `${selected.size} selected`;
+      bulkCategory.replaceChildren(
+        placeholder('Set category…'),
+        new Option('No category', ''),
+        ...categories.map(c => new Option(c, c)),
+      );
+      bulkMove.replaceChildren(placeholder('Move to…'), ...freezers.map(f => new Option(f.name, f.id)));
+      bulkCategory.parentElement.hidden = !categories.length;
+      bulkMove.parentElement.hidden = freezers.length < 2;
+      bulkCategory.disabled = bulkMove.disabled = bulkRemove.disabled = !selected.size;
 
       empty.hidden = shown.length > 0;
       empty.textContent = inView.length
@@ -406,6 +610,27 @@
       return button;
     }
 
+    function renderHeading(text) {
+      const li = document.createElement('li');
+      li.className = 'group';
+      li.textContent = text;
+      return li;
+    }
+
+    function placeholder(text) {
+      const option = new Option(text, '', true, true);
+      option.disabled = true;
+      return option;
+    }
+
+    function renderChip(category) {
+      const chip = chipTemplate.content.firstElementChild.cloneNode(true);
+      chip.dataset.category = category;
+      chip.querySelector('.rename').textContent = category;
+      chip.querySelector('.remove').setAttribute('aria-label', `Delete ${category}`);
+      return chip;
+    }
+
     function renderItem(item, showFreezer) {
       const li = rowTemplate.content.firstElementChild.cloneNode(true);
       const old = Boolean(item.added) && daysSince(item.added) >= OLD_AFTER_DAYS;
@@ -417,17 +642,35 @@
 
       li.dataset.id = item.id;
       li.classList.toggle('old', old);
+      li.classList.toggle('selected', selected.has(item.id));
+      const check = li.querySelector('.check');
+      check.checked = selected.has(item.id);
+      check.setAttribute('aria-label', `Select ${item.name}`);
       li.querySelector('.name').textContent = item.name;
       li.querySelector('.details').textContent = details.join(' · ');
       const count = li.querySelector('.n');
       count.value = item.qty;
       count.setAttribute('aria-label', `How many ${item.name}`);
 
-      const others = freezers.filter(f => f.id !== item.freezer);
-      if (others.length) li.querySelector('.move select').append(...others.map(f => new Option(f.name, f.id)));
-      else li.querySelector('.move').remove();
+      // Pickers for changing freezer and category, each starting on the current one.
+      const freezerPick = li.querySelector('.freezer-pick');
+      if (freezers.length > 1) {
+        freezerPick.append(...freezers.map(f => new Option(f.name, f.id)));
+        freezerPick.value = item.freezer;
+      } else {
+        freezerPick.parentElement.remove();
+      }
+      const categoryPick = li.querySelector('.category-pick');
+      if (categories.length) {
+        categoryPick.append(new Option('No category', ''), ...categories.map(c => new Option(c, c)));
+        categoryPick.value = item.category ?? '';
+      } else {
+        categoryPick.parentElement.remove();
+      }
+      li.querySelector('.actions').hidden = !li.querySelector('.pick');
 
-      if (item.qty === 1) {
+      // At 1 or less, minus would empty it, so it becomes a remove button.
+      if (item.qty <= 1) {
         const dec = li.querySelector('.dec');
         dec.textContent = '×';
         dec.title = 'Remove';
@@ -436,10 +679,46 @@
       return li;
     }
 
+    // Asks for a name and returns the category, reusing one that already exists.
+    function addCategory() {
+      const name = prompt('New category name')?.trim();
+      if (!name) return null;
+      const existing = categories.find(c => c.toLowerCase() === name.toLowerCase());
+      if (existing) return existing;
+      categories.push(name);
+      categories.sort(byName);
+      return name;
+    }
+
+    function renameCategory(old) {
+      const name = prompt('Rename category', old)?.trim();
+      if (!name || name === old) return;
+      // Renaming to a category that already exists merges the two.
+      const existing = categories.find(c => c !== old && c.toLowerCase() === name.toLowerCase());
+      const target = existing || name;
+      categories = existing
+        ? categories.filter(c => c !== old)
+        : categories.map(c => (c === old ? name : c)).sort(byName);
+      for (const item of items) if (item.category === old) item.category = target;
+      if (formCategory === old) formCategory = target;
+    }
+
+    function deleteCategory(category) {
+      const count = items
+        .filter(i => i.category === category)
+        .reduce((sum, i) => sum + i.qty, 0);
+      const question = count
+        ? `Delete ${category}? The ${things(count)} in it will have no category.`
+        : `Delete ${category}?`;
+      if (!confirm(question)) return;
+      categories = categories.filter(c => c !== category);
+      for (const item of items) if (item.category === category) item.category = undefined;
+    }
+
     tabs.addEventListener('click', event => {
       const id = event.target.closest('[data-freezer]')?.dataset.freezer;
       if (!id) return;
-      current = id;
+      setCurrent(id);
       if (id !== 'all') freezerSelect.value = id;
       render();
     });
@@ -449,7 +728,7 @@
       if (!name) return;
       const freezer = { id: newId(), name };
       freezers.push(freezer);
-      current = freezer.id;
+      setCurrent(freezer.id);
       save();
     });
 
@@ -472,7 +751,24 @@
       if (!confirm(question)) return;
       freezers = freezers.filter(f => f !== freezer);
       items = items.filter(i => i.freezer !== freezer.id);
-      current = 'all';
+      setCurrent('all');
+      save();
+    });
+
+    categorySelect.addEventListener('change', () => {
+      formCategory = categorySelect.selectedOptions[0] === newCategoryOption
+        ? addCategory() ?? formCategory
+        : categorySelect.value;
+      save();
+    });
+
+    categoryChips.addEventListener('click', event => {
+      const button = event.target.closest('button');
+      if (!button) return;
+      const category = button.closest('.chip')?.dataset.category;
+      if (button === addCategoryButton) addCategory();
+      else if (button.classList.contains('remove')) deleteCategory(category);
+      else renameCategory(category);
       save();
     });
 
@@ -480,13 +776,14 @@
       event.preventDefault();
       const name = nameInput.value.trim();
       if (!name) return;
-      const qty = Math.max(1, parseInt(qtyInput.value, 10) || 1);
+      const qty = amountOrOne(qtyInput.value);
       const added = dateInput.value || today();
       const freezer = currentFreezer()?.id ?? freezerSelect.value;
+      const category = formCategory || undefined;
 
-      const existing = findMatch(freezer, name, added);
-      if (existing) existing.qty += qty;
-      else items.push({ id: newId(), name, qty, added, freezer });
+      const existing = findMatch({ name, added, freezer, category });
+      if (existing) existing.qty = roundAmount(existing.qty + qty);
+      else items.push({ id: newId(), name, qty, added, freezer, category });
 
       save();
       nameInput.value = '';
@@ -495,31 +792,34 @@
     });
 
     list.addEventListener('click', event => {
+      const row = event.target.closest('.item');
+      if (!row) return;
+      const item = items.find(i => i.id === row.dataset.id);
+      if (selecting) {
+        if (selected.has(item.id)) selected.delete(item.id);
+        else selected.add(item.id);
+        render();
+        return;
+      }
       const button = event.target.closest('button');
       if (!button) return;
-      const item = items.find(i => i.id === button.closest('li').dataset.id);
-      item.qty += button.classList.contains('inc') ? 1 : -1;
+      item.qty = roundAmount(item.qty + (button.classList.contains('inc') ? 1 : -1));
       if (item.qty <= 0) items = items.filter(i => i !== item);
       save();
     });
 
     list.addEventListener('change', event => {
       const field = event.target;
+      if (!field.matches('.n, .freezer-pick, .category-pick')) return;
       const item = items.find(i => i.id === field.closest('li').dataset.id);
 
       if (field.matches('.n')) {
         // 0 removes the item; anything that isn't a number puts the old count back.
-        const qty = parseInt(field.value, 10);
+        const qty = parseAmount(field.value);
         if (qty === 0) items = items.filter(i => i !== item);
         else if (qty > 0) item.qty = qty;
-      } else if (field.matches('.move select')) {
-        const existing = findMatch(field.value, item.name, item.added);
-        if (existing) {
-          existing.qty += item.qty;
-          items = items.filter(i => i !== item);
-        } else {
-          item.freezer = field.value;
-        }
+      } else {
+        moveItem(item, field.matches('.freezer-pick') ? 'freezer' : 'category', field.value);
       }
       save();
     });
@@ -534,9 +834,37 @@
 
     search.addEventListener('input', render);
 
+    function toggleSelecting() {
+      selecting = !selecting;
+      selected.clear();
+      render();
+    }
+    selectToggle.addEventListener('click', toggleSelecting);
+    document.getElementById('bulk-done').addEventListener('click', toggleSelecting);
+
+    // Bulk actions clear the selection but stay in select mode for the next batch.
+    bulkBar.addEventListener('change', event => {
+      const key = event.target === bulkMove ? 'freezer' : 'category';
+      for (const item of items.filter(i => selected.has(i.id))) moveItem(item, key, event.target.value);
+      selected.clear();
+      save();
+    });
+
+    bulkRemove.addEventListener('click', () => {
+      const n = selected.size;
+      if (!confirm(`Remove ${n} selected item${n === 1 ? '' : 's'}?`)) return;
+      items = items.filter(i => !selected.has(i.id));
+      selected.clear();
+      save();
+    });
+
     document.getElementById('export').addEventListener('click', () => {
       // Item ids only matter while the page is open, so backups leave them out.
-      const backup = JSON.stringify({ freezers, items: items.map(({ id, ...item }) => item) }, null, 2);
+      const backup = JSON.stringify(
+        { freezers, categories, items: items.map(({ id, ...item }) => item) },
+        null,
+        2
+      );
       const link = document.createElement('a');
       link.href = URL.createObjectURL(new Blob([backup], { type: 'application/json' }));
       link.download = `freezer-vault-${today()}.json`;
@@ -561,8 +889,8 @@
       const question = `Replace everything with ${imported.items.length} items ` +
         `in ${n} freezer${n === 1 ? '' : 's'} from this backup?`;
       if (confirm(question)) {
-        ({ freezers, items } = imported);
-        current = 'all';
+        ({ freezers, categories, items } = imported);
+        setCurrent('all');
         save();
       }
     });
