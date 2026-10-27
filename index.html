@@ -132,7 +132,19 @@
     }
     .item.old { background: var(--old-bg); }
     .item.old .meta { color: var(--old); }
-    .name { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+    /* Editable in place; only as wide as the text, so the empty space beside it isn't a tap target. */
+    .name {
+      flex: 1 1 0;
+      min-width: 0;
+      max-width: fit-content;
+      margin-right: auto;
+      font-weight: 600;
+      overflow-wrap: anywhere;
+      border-radius: 4px;
+      cursor: text;
+    }
+    .name:hover { outline: 1px solid var(--border); outline-offset: 3px; }
+    .name:focus { outline: 2px solid var(--accent); outline-offset: 3px; }
     /* A full-width line under the name: dates, then the freezer and category dropdowns. */
     .meta {
       flex-basis: 100%;
@@ -297,7 +309,7 @@
   <template id="row">
     <li class="item">
       <label class="check-hit"><input class="check" type="checkbox"></label>
-      <div class="name"></div>
+      <div class="name" contenteditable="true" aria-label="Item name"></div>
       <div class="qty">
         <button class="dec" type="button" aria-label="Use one">−</button>
         <input class="n" inputmode="decimal">
@@ -456,8 +468,8 @@
       );
     }
 
-    // Changes an item's freezer or category, folding it into a matching row if there is one.
-    function moveItem(item, key, value) {
+    // Changes an item's name, freezer or category, folding it into a matching row if there is one.
+    function changeItem(item, key, value) {
       const moved = { ...item, [key]: value || undefined };
       const existing = findMatch(moved);
       if (existing && existing !== item) {
@@ -486,6 +498,25 @@
     // Two decimal places is plenty, and stops 0.1 + 0.2 showing up as 0.30000000000000004.
     function roundAmount(n) {
       return Math.round(n * 100) / 100;
+    }
+
+    // Asks how much to move when there's more than one, so part of it can stay behind.
+    function moveToFreezer(item, freezerId) {
+      let amount = item.qty;
+      if (item.qty > 1) {
+        const where = freezers.find(f => f.id === freezerId).name;
+        const answer = prompt(`Move how many of ${item.qty} ${item.name} to ${where}?`, item.qty);
+        if (answer === null) return;
+        amount = parseAmount(answer);
+        if (!(amount > 0)) return;
+      }
+      if (amount >= item.qty) return changeItem(item, 'freezer', freezerId);
+
+      item.qty = roundAmount(item.qty - amount);
+      const moved = { ...item, id: newId(), qty: amount, freezer: freezerId };
+      const existing = findMatch(moved);
+      if (existing) existing.qty = roundAmount(existing.qty + amount);
+      else items.push(moved);
     }
 
     function things(n) {
@@ -822,8 +853,10 @@
         const qty = parseAmount(field.value);
         if (qty === 0) items = items.filter(i => i !== item);
         else if (qty > 0) item.qty = qty;
+      } else if (field.matches('.freezer-pick')) {
+        moveToFreezer(item, field.value);
       } else {
-        moveItem(item, field.matches('.freezer-pick') ? 'freezer' : 'category', field.value);
+        changeItem(item, 'category', field.value);
       }
       save();
     });
@@ -833,7 +866,27 @@
       if (event.target.matches('.n')) event.target.select();
     });
     list.addEventListener('keydown', event => {
-      if (event.key === 'Enter' && event.target.matches('.n')) event.target.blur();
+      if (!event.target.matches('.n, .name')) return;
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        event.target.blur();
+      } else if (event.key === 'Escape' && event.target.matches('.name')) {
+        event.target.textContent = items.find(i => i.id === event.target.closest('li').dataset.id).name;
+        event.target.blur();
+      }
+    });
+
+    // Names are edited in place and saved when the field loses focus.
+    list.addEventListener('focusout', event => {
+      if (!event.target.matches('.name')) return;
+      const item = items.find(i => i.id === event.target.closest('li').dataset.id);
+      const name = event.target.textContent.replace(/\s+/g, ' ').trim();
+      if (!name) {
+        render(); // emptied: put the old name back
+      } else if (name !== item.name) {
+        changeItem(item, 'name', name);
+        save();
+      }
     });
 
     search.addEventListener('input', render);
@@ -846,7 +899,7 @@
     // Bulk actions untick everything once they're done.
     bulkBar.addEventListener('change', event => {
       const key = event.target === bulkMove ? 'freezer' : 'category';
-      for (const item of items.filter(i => selected.has(i.id))) moveItem(item, key, event.target.value);
+      for (const item of items.filter(i => selected.has(i.id))) changeItem(item, key, event.target.value);
       selected.clear();
       save();
     });
