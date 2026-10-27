@@ -39,7 +39,9 @@
       color: var(--text);
     }
     main { max-width: 560px; margin: 0 auto; padding: 24px 16px 48px; }
-    h1 { font-size: 1.5rem; margin: 0; }
+    .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    h1 { font-size: clamp(1.25rem, 6.5vw, 1.5rem); margin: 0; white-space: nowrap; }
+    .backup { display: flex; flex: none; gap: 6px; font-size: 0.85rem; }
 
     input, select, button { font: inherit; color: inherit; }
     input, select {
@@ -59,31 +61,24 @@
     }
 
     .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px; }
-    .tabs button {
+    .tabs button, .tab-menu {
       border: 1px solid var(--border);
       background: var(--card);
       border-radius: 999px;
       padding: 6px 14px;
     }
-    .tabs button[aria-pressed="true"] {
+    .tabs button[aria-pressed="true"], .tab-menu {
       background: var(--accent);
       border-color: var(--accent);
       color: #fff;
       font-weight: 600;
     }
     .tabs .new { background: none; border-style: dashed; color: var(--muted); }
+    /* The open freezer's tab is also its Rename/Delete menu. */
+    .tab-menu { position: relative; cursor: pointer; }
+    .tab-menu::after { content: " ▾"; font-weight: normal; }
 
-    .status {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: space-between;
-      align-items: baseline;
-      gap: 4px 12px;
-      margin: 10px 0 12px;
-      min-height: 1.4em;
-    }
-    #summary { color: var(--muted); margin: 0; }
-    #freezer-actions { display: flex; gap: 8px; font-size: 0.85rem; }
+    #summary { color: var(--muted); margin: 10px 0 12px; min-height: 1.4em; }
 
     .add {
       display: grid;
@@ -106,10 +101,16 @@
       font-weight: 600;
     }
 
-    .search-row { display: flex; align-items: center; gap: 8px; margin: 20px 0 10px; }
-    #search { flex: 1; background: var(--card); }
+    #search { width: 100%; margin: 20px 0 10px; background: var(--card); }
 
-    #list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+    #list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 8px;
+    }
     .group {
       margin: 12px 4px 0;
       font-size: 0.8rem;
@@ -121,8 +122,9 @@
     .group:first-child { margin-top: 0; }
     .item {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
-      gap: 12px;
+      gap: 2px 12px;
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 12px;
@@ -130,20 +132,26 @@
     }
     .item.old { background: var(--old-bg); }
     .item.old .meta { color: var(--old); }
-    .info { flex: 1; min-width: 0; }
-    .name { font-weight: 600; overflow-wrap: anywhere; }
-    .meta { font-size: 0.85rem; color: var(--muted); }
-    .pick {
-      position: relative;
-      display: inline-block;
-      color: var(--accent);
-      text-decoration: underline;
+    .name { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+    /* A full-width line under the name: dates, then the freezer and category dropdowns. */
+    .meta {
+      flex-basis: 100%;
+      min-width: 0;
+      padding-left: 32px; /* lines up under the name, past the checkbox */
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 2px 14px;
+      font-size: 0.85rem;
+      color: var(--muted);
     }
-    .actions { display: flex; gap: 14px; margin-top: 2px; font-size: 0.85rem; }
-    .pick:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
-    /* An invisible native select over the link: phones get their own picker,
+    .drop { position: relative; max-width: 100%; color: var(--accent); }
+    .drop::after { content: " ▾"; }
+    .drop:hover span { text-decoration: underline; }
+    .drop:focus-within, .tab-menu:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+    /* An invisible native select over the text: phones get their own picker,
        and 16px text stops iOS from zooming in when it's tapped. */
-    .pick select {
+    .drop select, .tab-menu select {
       position: absolute;
       inset: 0;
       width: 100%;
@@ -175,12 +183,11 @@
     }
     .qty .n:focus { outline: none; border-color: var(--accent); background: var(--bg); }
 
-    /* Select mode: rows get a checkbox and tap to select; per-row controls step aside. */
-    .check { display: none; flex: none; width: 20px; height: 20px; margin: 0; accent-color: var(--accent); }
-    body.selecting .check { display: block; }
-    body.selecting .qty, body.selecting .actions { display: none; }
-    body.selecting .item { cursor: pointer; user-select: none; }
-    body.selecting main { padding-bottom: 120px; }
+    /* Ticking any item brings up the bulk bar. The label pads the checkbox
+       out to a finger-sized target without taking more room in the card. */
+    .check-hit { display: flex; flex: none; padding: 10px; margin: -10px; cursor: pointer; }
+    .check { width: 20px; height: 20px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+    body.has-selection main { padding-bottom: 120px; }
     .item.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
     .bulk {
       position: fixed;
@@ -202,8 +209,9 @@
       font-size: 0.9rem;
     }
     #selected-count { margin-right: auto; color: var(--muted); }
-    .pick:has(select:disabled), .link:disabled { opacity: 0.4; cursor: default; }
-    .pick select:disabled { cursor: default; }
+    .bulk button { background: none; border: 0; padding: 4px; color: var(--accent); }
+    .bulk #bulk-remove { color: var(--old); }
+    .bulk #bulk-clear { color: var(--muted); }
 
     #empty { color: var(--muted); text-align: center; padding: 32px 0; }
 
@@ -231,19 +239,20 @@
 </head>
 <body>
   <main>
-    <h1>🧊 Freezer Vault</h1>
+    <header class="top">
+      <h1>🧊 Freezer Vault</h1>
+      <div class="backup">
+        <button id="export" class="link" type="button" title="Download a backup file">Export</button>
+        <button id="import" class="link" type="button" title="Load a backup file">Import</button>
+        <input id="import-file" type="file" accept=".json,application/json" hidden>
+      </div>
+    </header>
 
     <div class="tabs" id="tabs">
       <button id="add-freezer" class="new" type="button">+ Freezer</button>
     </div>
 
-    <div class="status">
-      <p id="summary"></p>
-      <span id="freezer-actions">
-        <button id="rename-freezer" class="link" type="button">Rename</button>
-        <button id="delete-freezer" class="link" type="button">Delete</button>
-      </span>
-    </div>
+    <p id="summary"></p>
 
     <form class="add" autocomplete="off">
       <input id="name" placeholder="What's going in?" aria-label="Item name" required>
@@ -266,46 +275,38 @@
       <p>Tap a category to rename it, or × to delete it.</p>
     </details>
 
-    <div class="search-row">
-      <input id="search" type="search" placeholder="Search…" aria-label="Search">
-      <button id="select-toggle" class="link" type="button">Select</button>
-    </div>
+    <input id="search" type="search" placeholder="Search…" aria-label="Search">
     <ul id="list"></ul>
     <p id="empty" hidden></p>
 
     <footer>
-      Saved in this browser only.
-      <button id="export" class="link" type="button">Export backup</button> ·
-      <button id="import" class="link" type="button">Import backup</button>
-      <input id="import-file" type="file" accept=".json,application/json" hidden>
+      Saved in this browser only. Use Export at the top to keep a backup.
     </footer>
 
     <div class="bulk" id="bulk" hidden>
       <div class="bulk-inner">
         <span id="selected-count"></span>
-        <label class="pick">Category<select id="bulk-category" aria-label="Set category for selected"></select></label>
-        <label class="pick">Move<select id="bulk-move" aria-label="Move selected to freezer"></select></label>
-        <button id="bulk-remove" class="link" type="button">Remove</button>
-        <button id="bulk-done" class="link" type="button">Done</button>
+        <label class="drop"><span>Category</span><select id="bulk-category" aria-label="Set category for selected"></select></label>
+        <label class="drop"><span>Move</span><select id="bulk-move" aria-label="Move selected to freezer"></select></label>
+        <button id="bulk-remove" type="button">Remove</button>
+        <button id="bulk-clear" type="button">Clear</button>
       </div>
     </div>
   </main>
 
   <template id="row">
     <li class="item">
-      <input class="check" type="checkbox">
-      <div class="info">
-        <div class="name"></div>
-        <div class="meta details"></div>
-        <div class="actions">
-          <label class="pick">Move<select class="freezer-pick" aria-label="Freezer"></select></label>
-          <label class="pick">Category<select class="category-pick" aria-label="Category"></select></label>
-        </div>
-      </div>
+      <label class="check-hit"><input class="check" type="checkbox"></label>
+      <div class="name"></div>
       <div class="qty">
         <button class="dec" type="button" aria-label="Use one">−</button>
         <input class="n" inputmode="decimal">
         <button class="inc" type="button" aria-label="Add one">+</button>
+      </div>
+      <div class="meta">
+        <span class="details"></span>
+        <label class="drop"><span></span><select class="freezer-pick" aria-label="Freezer"></select></label>
+        <label class="drop"><span></span><select class="category-pick" aria-label="Category"></select></label>
       </div>
     </li>
   </template>
@@ -326,8 +327,6 @@
     const tabs = document.getElementById('tabs');
     const addFreezerButton = document.getElementById('add-freezer');
     const summary = document.getElementById('summary');
-    const freezerActions = document.getElementById('freezer-actions');
-    const deleteFreezerButton = document.getElementById('delete-freezer');
     const form = document.querySelector('.add');
     const nameInput = document.getElementById('name');
     const categorySelect = document.getElementById('category');
@@ -342,7 +341,6 @@
     const rowTemplate = document.getElementById('row');
     const chipTemplate = document.getElementById('chip');
     const importFile = document.getElementById('import-file');
-    const selectToggle = document.getElementById('select-toggle');
     const bulkBar = document.getElementById('bulk');
     const selectedCount = document.getElementById('selected-count');
     const bulkCategory = document.getElementById('bulk-category');
@@ -353,8 +351,7 @@
     let { freezers, categories, items } = load();
     let current = loadView(); // a freezer id, or 'all'
     let formCategory = ''; // kept so picking "+ New category…" can be cancelled
-    let selecting = false; // picking several items for a bulk action
-    const selected = new Set(); // ids of the picked items
+    const selected = new Set(); // ids of the ticked items
 
     function load() {
       try {
@@ -550,14 +547,12 @@
       const headings = groups.some(group => group.category);
       list.replaceChildren(...groups.flatMap(group => [
         ...(headings ? [renderHeading(group.category ?? 'No category')] : []),
-        ...group.rows.map(item => renderItem(item, !freezer)),
+        ...group.rows.map(renderItem),
       ]));
 
       const total = inView.reduce((sum, item) => sum + item.qty, 0);
       const where = freezer ? freezer.name : `${freezers.length} freezers`;
       summary.textContent = total ? `${things(total)} in ${where}, oldest first.` : '';
-      freezerActions.hidden = !freezer;
-      deleteFreezerButton.hidden = freezers.length < 2;
 
       // Only the "All" view needs to ask which freezer new items go in.
       freezerSelect.hidden = !!freezer;
@@ -575,9 +570,9 @@
 
       categoryChips.replaceChildren(...categories.map(renderChip), addCategoryButton);
 
-      document.body.classList.toggle('selecting', selecting);
-      selectToggle.textContent = selecting ? 'Done' : 'Select';
-      bulkBar.hidden = !selecting;
+      // The bulk bar shows up once anything is ticked.
+      document.body.classList.toggle('has-selection', selected.size > 0);
+      bulkBar.hidden = !selected.size;
       selectedCount.textContent = `${selected.size} selected`;
       bulkCategory.replaceChildren(
         placeholder('Set category…'),
@@ -587,7 +582,6 @@
       bulkMove.replaceChildren(placeholder('Move to…'), ...freezers.map(f => new Option(f.name, f.id)));
       bulkCategory.parentElement.hidden = !categories.length;
       bulkMove.parentElement.hidden = freezers.length < 2;
-      bulkCategory.disabled = bulkMove.disabled = bulkRemove.disabled = !selected.size;
 
       empty.hidden = shown.length > 0;
       empty.textContent = inView.length
@@ -597,8 +591,21 @@
 
     function renderTabs(active) {
       const buttons = freezers.length > 1 ? [tabButton('All', 'all', !active)] : [];
-      for (const f of freezers) buttons.push(tabButton(f.name, f.id, f === active));
+      for (const f of freezers) buttons.push(f === active ? freezerMenu(f) : tabButton(f.name, f.id, false));
       tabs.replaceChildren(...buttons, addFreezerButton);
+    }
+
+    // The open freezer's tab, with a menu for renaming or deleting it.
+    function freezerMenu(freezer) {
+      const tab = document.createElement('label');
+      tab.className = 'tab-menu';
+      tab.textContent = freezer.name;
+      const menu = document.createElement('select');
+      menu.setAttribute('aria-label', `${freezer.name} options`);
+      menu.append(placeholder(freezer.name), new Option('Rename…', 'rename'));
+      if (freezers.length > 1) menu.append(new Option('Delete…', 'delete'));
+      tab.append(menu);
+      return tab;
     }
 
     function tabButton(label, id, pressed) {
@@ -631,14 +638,13 @@
       return chip;
     }
 
-    function renderItem(item, showFreezer) {
+    function renderItem(item) {
       const li = rowTemplate.content.firstElementChild.cloneNode(true);
       const old = Boolean(item.added) && daysSince(item.added) >= OLD_AFTER_DAYS;
       const details = item.added
         ? [formatDate(item.added), ago(daysSince(item.added))]
         : ['No date'];
       if (old) details.push('use soon');
-      if (showFreezer) details.unshift(freezers.find(f => f.id === item.freezer).name);
 
       li.dataset.id = item.id;
       li.classList.toggle('old', old);
@@ -652,11 +658,12 @@
       count.value = item.qty;
       count.setAttribute('aria-label', `How many ${item.name}`);
 
-      // Pickers for changing freezer and category, each starting on the current one.
+      // Freezer and category dropdowns show the current value and start on it.
       const freezerPick = li.querySelector('.freezer-pick');
       if (freezers.length > 1) {
         freezerPick.append(...freezers.map(f => new Option(f.name, f.id)));
         freezerPick.value = item.freezer;
+        freezerPick.previousElementSibling.textContent = freezerPick.selectedOptions[0].text;
       } else {
         freezerPick.parentElement.remove();
       }
@@ -664,10 +671,10 @@
       if (categories.length) {
         categoryPick.append(new Option('No category', ''), ...categories.map(c => new Option(c, c)));
         categoryPick.value = item.category ?? '';
+        categoryPick.previousElementSibling.textContent = item.category ?? 'Add category';
       } else {
         categoryPick.parentElement.remove();
       }
-      li.querySelector('.actions').hidden = !li.querySelector('.pick');
 
       // At 1 or less, minus would empty it, so it becomes a remove button.
       if (item.qty <= 1) {
@@ -732,27 +739,25 @@
       save();
     });
 
-    document.getElementById('rename-freezer').addEventListener('click', () => {
+    tabs.addEventListener('change', event => {
       const freezer = currentFreezer();
-      const name = prompt('Rename this freezer', freezer.name)?.trim();
-      if (!name) return;
-      freezer.name = name;
-      save();
-    });
-
-    deleteFreezerButton.addEventListener('click', () => {
-      const freezer = currentFreezer();
-      const count = items
-        .filter(i => i.freezer === freezer.id)
-        .reduce((sum, i) => sum + i.qty, 0);
-      const question = count
-        ? `Delete ${freezer.name} and the ${things(count)} in it?`
-        : `Delete ${freezer.name}?`;
-      if (!confirm(question)) return;
-      freezers = freezers.filter(f => f !== freezer);
-      items = items.filter(i => i.freezer !== freezer.id);
-      setCurrent('all');
-      save();
+      if (event.target.value === 'rename') {
+        const name = prompt('Rename this freezer', freezer.name)?.trim();
+        if (name) freezer.name = name;
+      } else if (event.target.value === 'delete') {
+        const count = items
+          .filter(i => i.freezer === freezer.id)
+          .reduce((sum, i) => sum + i.qty, 0);
+        const question = count
+          ? `Delete ${freezer.name} and the ${things(count)} in it?`
+          : `Delete ${freezer.name}?`;
+        if (confirm(question)) {
+          freezers = freezers.filter(f => f !== freezer);
+          items = items.filter(i => i.freezer !== freezer.id);
+          setCurrent('all');
+        }
+      }
+      save(); // also resets the menu if it was cancelled
     });
 
     categorySelect.addEventListener('change', () => {
@@ -792,17 +797,9 @@
     });
 
     list.addEventListener('click', event => {
-      const row = event.target.closest('.item');
-      if (!row) return;
-      const item = items.find(i => i.id === row.dataset.id);
-      if (selecting) {
-        if (selected.has(item.id)) selected.delete(item.id);
-        else selected.add(item.id);
-        render();
-        return;
-      }
       const button = event.target.closest('button');
       if (!button) return;
+      const item = items.find(i => i.id === button.closest('li').dataset.id);
       item.qty = roundAmount(item.qty + (button.classList.contains('inc') ? 1 : -1));
       if (item.qty <= 0) items = items.filter(i => i !== item);
       save();
@@ -810,8 +807,15 @@
 
     list.addEventListener('change', event => {
       const field = event.target;
-      if (!field.matches('.n, .freezer-pick, .category-pick')) return;
+      if (!field.matches('.check, .n, .freezer-pick, .category-pick')) return;
       const item = items.find(i => i.id === field.closest('li').dataset.id);
+
+      if (field.matches('.check')) {
+        if (field.checked) selected.add(item.id);
+        else selected.delete(item.id);
+        render();
+        return;
+      }
 
       if (field.matches('.n')) {
         // 0 removes the item; anything that isn't a number puts the old count back.
@@ -834,15 +838,12 @@
 
     search.addEventListener('input', render);
 
-    function toggleSelecting() {
-      selecting = !selecting;
+    document.getElementById('bulk-clear').addEventListener('click', () => {
       selected.clear();
       render();
-    }
-    selectToggle.addEventListener('click', toggleSelecting);
-    document.getElementById('bulk-done').addEventListener('click', toggleSelecting);
+    });
 
-    // Bulk actions clear the selection but stay in select mode for the next batch.
+    // Bulk actions untick everything once they're done.
     bulkBar.addEventListener('change', event => {
       const key = event.target === bulkMove ? 'freezer' : 'category';
       for (const item of items.filter(i => selected.has(i.id))) moveItem(item, key, event.target.value);
