@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Freezer Vault</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧊</text></svg>">
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f3f6f9;
+      --card: #ffffff;
+      --text: #1b2430;
+      --muted: #6a7684;
+      --border: #dce3ea;
+      --accent: #2b74c9;
+      --old: #b9480f;
+      --old-bg: #fff3eb;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #11161c;
+        --card: #1a212a;
+        --text: #e5ecf2;
+        --muted: #8a97a5;
+        --border: #2b3541;
+        --accent: #5c9fe8;
+        --old: #f39a5b;
+        --old-bg: #2a1e16;
+      }
+    }
+
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body {
+      margin: 0;
+      font: 16px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    main { max-width: 560px; margin: 0 auto; padding: 24px 16px 48px; }
+    h1 { font-size: 1.5rem; margin: 0; }
+
+    input, select, button { font: inherit; color: inherit; }
+    input, select {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      min-width: 0;
+    }
+    button { cursor: pointer; }
+    .link {
+      background: none;
+      border: 0;
+      padding: 4px;
+      color: var(--accent);
+      text-decoration: underline;
+    }
+
+    .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px; }
+    .tabs button {
+      border: 1px solid var(--border);
+      background: var(--card);
+      border-radius: 999px;
+      padding: 6px 14px;
+    }
+    .tabs button[aria-pressed="true"] {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 600;
+    }
+    .tabs .new { background: none; border-style: dashed; color: var(--muted); }
+
+    .status {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 4px 12px;
+      margin: 10px 0 12px;
+      min-height: 1.4em;
+    }
+    #summary { color: var(--muted); margin: 0; }
+    #freezer-actions { display: flex; gap: 8px; font-size: 0.85rem; }
+
+    .add {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 8px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+    }
+    .add .row { display: flex; gap: 8px; }
+    #name { flex: 1; }
+    #freezer { max-width: 45%; }
+    #qty { width: 72px; }
+    #added { flex: 1; }
+    .add button {
+      background: var(--accent);
+      color: #fff;
+      border: 0;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-weight: 600;
+    }
+
+    #search { width: 100%; margin: 20px 0 10px; background: var(--card); }
+
+    #list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+    .item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 12px;
+    }
+    .item.old { background: var(--old-bg); }
+    .item.old .meta { color: var(--old); }
+    .info { flex: 1; min-width: 0; }
+    .name { font-weight: 600; overflow-wrap: anywhere; }
+    .meta { font-size: 0.85rem; color: var(--muted); }
+    .move {
+      position: relative;
+      display: inline-block;
+      color: var(--accent);
+      text-decoration: underline;
+    }
+    .move:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+    /* An invisible native select over the link: phones get their own picker,
+       and 16px text stops iOS from zooming in when it's tapped. */
+    .move select {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      font-size: 16px;
+      padding: 0;
+      border: 0;
+      cursor: pointer;
+    }
+    .qty { display: flex; align-items: center; gap: 6px; }
+    .qty button {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      font-size: 1.2rem;
+      line-height: 1;
+    }
+    .qty .n {
+      width: 3em;
+      padding: 4px 2px;
+      background: none;
+      border-radius: 6px;
+      text-align: center;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      -moz-appearance: textfield;
+    }
+    .qty .n:focus { outline: none; border-color: var(--accent); background: var(--bg); }
+    .qty .n::-webkit-inner-spin-button,
+    .qty .n::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+    #empty { color: var(--muted); text-align: center; padding: 32px 0; }
+
+    footer { margin-top: 40px; font-size: 0.85rem; color: var(--muted); text-align: center; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>🧊 Freezer Vault</h1>
+
+    <div class="tabs" id="tabs">
+      <button id="add-freezer" class="new" type="button">+ Freezer</button>
+    </div>
+
+    <div class="status">
+      <p id="summary"></p>
+      <span id="freezer-actions">
+        <button id="rename-freezer" class="link" type="button">Rename</button>
+        <button id="delete-freezer" class="link" type="button">Delete</button>
+      </span>
+    </div>
+
+    <form class="add" autocomplete="off">
+      <div class="row">
+        <input id="name" placeholder="What's going in?" aria-label="Item name" required>
+        <select id="freezer" aria-label="Which freezer"></select>
+      </div>
+      <div class="row">
+        <input id="qty" type="number" min="1" value="1" aria-label="Quantity">
+        <input id="added" type="date" aria-label="Date frozen">
+        <button type="submit">Add</button>
+      </div>
+    </form>
+
+    <input id="search" type="search" placeholder="Search…" aria-label="Search">
+    <ul id="list"></ul>
+    <p id="empty" hidden></p>
+
+    <footer>
+      Saved in this browser only.
+      <button id="export" class="link" type="button">Export backup</button> ·
+      <button id="import" class="link" type="button">Import backup</button>
+      <input id="import-file" type="file" accept=".json,application/json" hidden>
+    </footer>
+  </main>
+
+  <template id="row">
+    <li class="item">
+      <div class="info">
+        <div class="name"></div>
+        <div class="meta">
+          <span class="details"></span>
+          <label class="move">Move<select aria-label="Move to another freezer">
+            <option value="" selected disabled>Move to…</option>
+          </select></label>
+        </div>
+      </div>
+      <div class="qty">
+        <button class="dec" type="button" aria-label="Use one">−</button>
+        <input class="n" type="number" inputmode="numeric" min="0">
+        <button class="inc" type="button" aria-label="Add one">+</button>
+      </div>
+    </li>
+  </template>
+
+  <script>
+    const STORAGE_KEY = 'freezer-vault';
+    const OLD_AFTER_DAYS = 90;
+
+    const tabs = document.getElementById('tabs');
+    const addFreezerButton = document.getElementById('add-freezer');
+    const summary = document.getElementById('summary');
+    const freezerActions = document.getElementById('freezer-actions');
+    const deleteFreezerButton = document.getElementById('delete-freezer');
+    const form = document.querySelector('.add');
+    const nameInput = document.getElementById('name');
+    const freezerSelect = document.getElementById('freezer');
+    const qtyInput = document.getElementById('qty');
+    const dateInput = document.getElementById('added');
+    const search = document.getElementById('search');
+    const list = document.getElementById('list');
+    const empty = document.getElementById('empty');
+    const rowTemplate = document.getElementById('row');
+    const importFile = document.getElementById('import-file');
+
+    let { freezers, items } = load();
+    let current = 'all'; // a freezer id, or 'all'
+
+    function load() {
+      try {
+        const data = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        if (data) return normalize(data);
+      } catch {}
+      return normalize({ items: [] });
+    }
+
+    function save() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ freezers, items }));
+      } catch {}
+      render();
+    }
+
+    // Cleans up saved data or a backup file, filling in anything left out so
+    // backups are easy to write by hand. Only item names are required. The
+    // first version stored a plain list of items with no freezers.
+    function normalize(data) {
+      if (Array.isArray(data)) data = { items: data };
+      if (!data || !Array.isArray(data.items)) throw new Error('not freezer data');
+
+      const freezers = (Array.isArray(data.freezers) ? data.freezers : [])
+        .filter(f => f && typeof f.name === 'string' && f.name.trim())
+        .map(f => ({ id: typeof f.id === 'string' ? f.id : newId(), name: f.name.trim() }));
+      if (!freezers.length) freezers.push({ id: newId(), name: 'Main freezer' });
+
+      // Items can point at a freezer by id or by name (any capitalization).
+      // A missing or misspelled freezer means the first one.
+      function freezerFor(ref) {
+        const name = String(ref ?? '').trim().toLowerCase();
+        const freezer = freezers.find(f => f.id === ref) ||
+          freezers.find(f => f.name.toLowerCase() === name) ||
+          freezers[0];
+        return freezer.id;
+      }
+
+      const items = data.items
+        .filter(i => i && typeof i.name === 'string')
+        .map(i => ({
+          id: newId(),
+          name: i.name,
+          qty: Math.max(1, parseInt(i.qty, 10) || 1),
+          added: /^\d{4}-\d{2}-\d{2}$/.test(i.added) ? i.added : undefined,
+          freezer: freezerFor(i.freezer),
+        }));
+
+      return { freezers, items };
+    }
+
+    function newId() {
+      return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    }
+
+    // The freezer being viewed, or null for the "All" view.
+    function currentFreezer() {
+      if (freezers.length === 1) return freezers[0];
+      return freezers.find(f => f.id === current) || null;
+    }
+
+    // Same thing frozen on the same day in the same freezer shares one row.
+    function findMatch(freezer, name, added) {
+      return items.find(item =>
+        item.freezer === freezer && item.added === added &&
+        item.name.toLowerCase() === name.toLowerCase()
+      );
+    }
+
+    function things(n) {
+      return `${n} thing${n === 1 ? '' : 's'}`;
+    }
+
+    // Dates are stored as local "YYYY-MM-DD" strings to avoid timezone drift.
+    function today() {
+      const d = new Date();
+      return [d.getFullYear(), d.getMonth() + 1, d.getDate()]
+        .map(n => String(n).padStart(2, '0'))
+        .join('-');
+    }
+
+    function parseDate(dateStr) {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      return new Date(y, m - 1, d);
+    }
+
+    function daysSince(dateStr) {
+      return Math.round((parseDate(today()) - parseDate(dateStr)) / 86400000);
+    }
+
+    function formatDate(dateStr) {
+      const date = parseDate(dateStr);
+      const options = { month: 'short', day: 'numeric' };
+      if (date.getFullYear() !== new Date().getFullYear()) options.year = 'numeric';
+      return date.toLocaleDateString(undefined, options);
+    }
+
+    function ago(days) {
+      if (days <= 0) return 'today';
+      if (days === 1) return 'yesterday';
+      if (days < 14) return `${days} days ago`;
+      if (days < 60) return `${Math.floor(days / 7)} weeks ago`;
+      return `${Math.floor(days / 30)} months ago`;
+    }
+
+    function render() {
+      const freezer = currentFreezer();
+      renderTabs(freezer);
+
+      const inView = freezer ? items.filter(i => i.freezer === freezer.id) : items;
+      const query = search.value.trim().toLowerCase();
+      const shown = inView
+        .filter(item => item.name.toLowerCase().includes(query))
+        // Undated items sort first: they were probably in there before tracking started.
+        .sort((a, b) => (a.added || '').localeCompare(b.added || ''));
+
+      list.replaceChildren(...shown.map(item => renderItem(item, !freezer)));
+
+      const total = inView.reduce((sum, item) => sum + item.qty, 0);
+      const where = freezer ? freezer.name : `${freezers.length} freezers`;
+      summary.textContent = total ? `${things(total)} in ${where}, oldest first.` : '';
+      freezerActions.hidden = !freezer;
+      deleteFreezerButton.hidden = freezers.length < 2;
+
+      // Only the "All" view needs to ask which freezer new items go in.
+      freezerSelect.hidden = !!freezer;
+      const selected = freezerSelect.value;
+      freezerSelect.replaceChildren(...freezers.map(f => new Option(f.name, f.id)));
+      if (freezers.some(f => f.id === selected)) freezerSelect.value = selected;
+
+      empty.hidden = shown.length > 0;
+      empty.textContent = inView.length
+        ? 'Nothing matches that search.'
+        : 'Nothing in here yet. Add something above.';
+    }
+
+    function renderTabs(active) {
+      const buttons = freezers.length > 1 ? [tabButton('All', 'all', !active)] : [];
+      for (const f of freezers) buttons.push(tabButton(f.name, f.id, f === active));
+      tabs.replaceChildren(...buttons, addFreezerButton);
+    }
+
+    function tabButton(label, id, pressed) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = label;
+      button.dataset.freezer = id;
+      button.setAttribute('aria-pressed', pressed);
+      return button;
+    }
+
+    function renderItem(item, showFreezer) {
+      const li = rowTemplate.content.firstElementChild.cloneNode(true);
+      const old = Boolean(item.added) && daysSince(item.added) >= OLD_AFTER_DAYS;
+      const details = item.added
+        ? [formatDate(item.added), ago(daysSince(item.added))]
+        : ['No date'];
+      if (old) details.push('use soon');
+      if (showFreezer) details.unshift(freezers.find(f => f.id === item.freezer).name);
+
+      li.dataset.id = item.id;
+      li.classList.toggle('old', old);
+      li.querySelector('.name').textContent = item.name;
+      li.querySelector('.details').textContent = details.join(' · ');
+      const count = li.querySelector('.n');
+      count.value = item.qty;
+      count.setAttribute('aria-label', `How many ${item.name}`);
+
+      const others = freezers.filter(f => f.id !== item.freezer);
+      if (others.length) li.querySelector('.move select').append(...others.map(f => new Option(f.name, f.id)));
+      else li.querySelector('.move').remove();
+
+      if (item.qty === 1) {
+        const dec = li.querySelector('.dec');
+        dec.textContent = '×';
+        dec.title = 'Remove';
+        dec.setAttribute('aria-label', `Remove ${item.name}`);
+      }
+      return li;
+    }
+
+    tabs.addEventListener('click', event => {
+      const id = event.target.closest('[data-freezer]')?.dataset.freezer;
+      if (!id) return;
+      current = id;
+      if (id !== 'all') freezerSelect.value = id;
+      render();
+    });
+
+    addFreezerButton.addEventListener('click', () => {
+      const name = prompt('Name the new freezer (e.g. Garage)')?.trim();
+      if (!name) return;
+      const freezer = { id: newId(), name };
+      freezers.push(freezer);
+      current = freezer.id;
+      save();
+    });
+
+    document.getElementById('rename-freezer').addEventListener('click', () => {
+      const freezer = currentFreezer();
+      const name = prompt('Rename this freezer', freezer.name)?.trim();
+      if (!name) return;
+      freezer.name = name;
+      save();
+    });
+
+    deleteFreezerButton.addEventListener('click', () => {
+      const freezer = currentFreezer();
+      const count = items
+        .filter(i => i.freezer === freezer.id)
+        .reduce((sum, i) => sum + i.qty, 0);
+      const question = count
+        ? `Delete ${freezer.name} and the ${things(count)} in it?`
+        : `Delete ${freezer.name}?`;
+      if (!confirm(question)) return;
+      freezers = freezers.filter(f => f !== freezer);
+      items = items.filter(i => i.freezer !== freezer.id);
+      current = 'all';
+      save();
+    });
+
+    form.addEventListener('submit', event => {
+      event.preventDefault();
+      const name = nameInput.value.trim();
+      if (!name) return;
+      const qty = Math.max(1, parseInt(qtyInput.value, 10) || 1);
+      const added = dateInput.value || today();
+      const freezer = currentFreezer()?.id ?? freezerSelect.value;
+
+      const existing = findMatch(freezer, name, added);
+      if (existing) existing.qty += qty;
+      else items.push({ id: newId(), name, qty, added, freezer });
+
+      save();
+      nameInput.value = '';
+      qtyInput.value = 1;
+      nameInput.focus();
+    });
+
+    list.addEventListener('click', event => {
+      const button = event.target.closest('button');
+      if (!button) return;
+      const item = items.find(i => i.id === button.closest('li').dataset.id);
+      item.qty += button.classList.contains('inc') ? 1 : -1;
+      if (item.qty <= 0) items = items.filter(i => i !== item);
+      save();
+    });
+
+    list.addEventListener('change', event => {
+      const field = event.target;
+      const item = items.find(i => i.id === field.closest('li').dataset.id);
+
+      if (field.matches('.n')) {
+        // 0 removes the item; anything that isn't a number puts the old count back.
+        const qty = parseInt(field.value, 10);
+        if (qty === 0) items = items.filter(i => i !== item);
+        else if (qty > 0) item.qty = qty;
+      } else if (field.matches('.move select')) {
+        const existing = findMatch(field.value, item.name, item.added);
+        if (existing) {
+          existing.qty += item.qty;
+          items = items.filter(i => i !== item);
+        } else {
+          item.freezer = field.value;
+        }
+      }
+      save();
+    });
+
+    // Tapping a count selects it so typing replaces it; Enter saves.
+    list.addEventListener('focusin', event => {
+      if (event.target.matches('.n')) event.target.select();
+    });
+    list.addEventListener('keydown', event => {
+      if (event.key === 'Enter' && event.target.matches('.n')) event.target.blur();
+    });
+
+    search.addEventListener('input', render);
+
+    document.getElementById('export').addEventListener('click', () => {
+      // Item ids only matter while the page is open, so backups leave them out.
+      const backup = JSON.stringify({ freezers, items: items.map(({ id, ...item }) => item) }, null, 2);
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(new Blob([backup], { type: 'application/json' }));
+      link.download = `freezer-vault-${today()}.json`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    });
+
+    document.getElementById('import').addEventListener('click', () => importFile.click());
+
+    importFile.addEventListener('change', async () => {
+      const file = importFile.files[0];
+      importFile.value = '';
+      if (!file) return;
+      let imported;
+      try {
+        imported = normalize(JSON.parse(await file.text()));
+      } catch {
+        alert("That file doesn't look like a Freezer Vault backup.");
+        return;
+      }
+      const n = imported.freezers.length;
+      const question = `Replace everything with ${imported.items.length} items ` +
+        `in ${n} freezer${n === 1 ? '' : 's'} from this backup?`;
+      if (confirm(question)) {
+        ({ freezers, items } = imported);
+        current = 'all';
+        save();
+      }
+    });
+
+    dateInput.value = today();
+    render();
+  </script>
+</body>
+</html>
